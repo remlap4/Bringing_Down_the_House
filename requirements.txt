@@ -1,0 +1,2 @@
+# Python 3.10.11-compatible pinned dependencies.
+-r requirements-lock.txt

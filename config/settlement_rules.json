@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "reviewed_on": "2026-11-17",
+  "scope": "Page-level full-game NBA two-way moneyline research. Original quote records remain unmodified/unverified. No complete rules-equivalence claim.",
+  "profiles": [
+    {
+      "id": "pinnacle:nba:full_game:2026-11-17",
+      "bookmaker": "pinnacle",
+      "page_review_status": "reviewed",
+      "quote_binding_status": "pending",
+      "period": "full_game",
+      "overtime_included": true,
+      "region_scope": "public pinnacle.com rule page; no account jurisdiction asserted",
+      "summary": {
+        "overtime": "Game and second-half periods include overtime.",
+        "minimum_duration": "NBA game-period bets void below 43 minutes completed.",
+        "delayed_start": "General rule voids fixtures not started within 12 hours of scheduled start.",
+        "completion_window": "General rule voids started fixtures unfinished within 30 hours of planned start, subject to sport/market exceptions.",
+        "draw": "Two-way moneyline without a draw option voids if a draw occurs.",
+        "precedence": "Market rules override sport rules, which override general rules."
+      },
+      "evidence": [
+        {
+          "path": "data/source_probes/20261117T220722259617Z_pinnacle_rules",
+          "url": "https://www.pinnacle.com/en/future/betting-rules",
+          "captured_at_utc": "2026-11-17T22:07:24.660Z",
+          "html_sha256": "9020a05bca0982d2fb1be564e1cb8e79d61833e605c1ff0ff8559aa83a4bd669",
+          "http_status": 200
+        }
+      ]
+    },
+    {
+      "id": "draftkings:nba:full_game:2026-11-17",
+      "bookmaker": "draftkings",
+      "page_review_status": "reviewed",
+      "quote_binding_status": "pending",
+      "period": "full_game",
+      "overtime_included": true,
+      "region_scope": "Rendered sportsbook.draftkings.com pages include Ontario footer links; confirm applicability when binding each quote.",
+      "summary": {
+        "overtime": "Standard full-game markets include overtime; specified three-way/quarter and aggregate-scoring exceptions exist.",
+        "delayed_start": "General rules use two calendar days from scheduled start date in stadium local time; basketball postseason rule extends to four.",
+        "interruption": "Basketball distinguishes interruptions with at least five regulation minutes remaining from later interruptions, using two-day/four-day conclusion windows.",
+        "moneyline": "For qualifying resumed/concluded interrupted games, full-game moneyline uses the declared winner; other market treatment can differ.",
+        "late_interruption": "Certain late interrupted games not concluded within the applicable window settle using last-play statistics."
+      },
+      "evidence": [
+        {
+          "path": "data/source_probes/20261117T220725844571Z_draftkings_rules",
+          "url": "https://sportsbook.draftkings.com/help/sport-rules/basketball",
+          "captured_at_utc": "2026-11-17T22:07:34.888Z",
+          "html_sha256": "f24fbc58e9428357848d6dc14011bf850b576a9be0d430a0d6caae2023c95289",
+          "http_status": 200
+        },
+        {
+          "path": "data/source_probes/20261117T220901967629Z_draftkings_general_rules_98a653dd",
+          "url": "https://sportsbook.draftkings.com/help/general-betting-rules/general-rules",
+          "captured_at_utc": "2026-11-17T22:09:11.064Z",
+          "html_sha256": "e087476e2e7055ae8d6bd68081790e218d392689b8607c3942beea179151035b",
+          "http_status": 200
+        }
+      ]
+    }
+  ],
+  "comparisons": [
+    {
+      "books": [
+        "pinnacle",
+        "draftkings"
+      ],
+      "market": "NBA full-game two-way moneyline",
+      "overtime_alignment": true,
+      "full_settlement_equivalence": false,
+      "analysis_compatibility": "not_approved",
+      "reason": "Different delay/interruption/void treatment; per-quote rule binding also pending. Future matching must preserve distinct profiles and define an explicit compatibility policy rather than equating these rules."
+    }
+  ]
+}

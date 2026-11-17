@@ -2,3 +2,9 @@
 .browsers/
 __pycache__/
 data/
+
+# Project-local Unix runtime downloads and caches
+.python/
+.cache/
+
+ROADMAP.md

@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "observation_id": "synthetic-observation-1",
+  "run_id": "synthetic-run-1",
+  "source": "draftkings",
+  "bookmaker": "draftkings",
+  "source_url": "https://sportsbook.draftkings.com/leagues/basketball/nba",
+  "observed_at_utc": "2026-11-17T20:00:00Z",
+  "source_updated_at_utc": null,
+  "event": {
+    "league": "NBA",
+    "source_event_id": "fixture-event-1",
+    "canonical_event_id": null,
+    "season": null,
+    "participants": [
+      {
+        "source_name": "Fixture Away",
+        "canonical_team_id": null,
+        "role": "unknown"
+      },
+      {
+        "source_name": "Fixture Home",
+        "canonical_team_id": null,
+        "role": "unknown"
+      }
+    ],
+    "scheduled_start_utc": "2026-11-18T00:00:00Z",
+    "scheduled_start_text": "Today 7:00 PM",
+    "status": "pregame",
+    "status_evidence": "Today 7:00 PM"
+  },
+  "market": {
+    "type": "moneyline",
+    "period": "unknown",
+    "line": null,
+    "overtime_included": null,
+    "settlement_rule_id": null,
+    "rule_status": "unverified",
+    "source_label": "Moneyline"
+  },
+  "selections": [
+    {
+      "source_selection_id": "fixture-a",
+      "participant_index": 0,
+      "odds_text": "+150",
+      "odds_format": "american",
+      "decimal_odds": 2.5,
+      "status": "available"
+    },
+    {
+      "source_selection_id": "fixture-b",
+      "participant_index": 1,
+      "odds_text": "-200",
+      "odds_format": "american",
+      "decimal_odds": 1.5,
+      "status": "available"
+    }
+  ],
+  "provenance": {
+    "parser_version": "synthetic-fixture-v1",
+    "html_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "capture_started_at_utc": "2026-11-17T19:59:58Z",
+    "region": null,
+    "evidence_path": "tests/fixtures/synthetic-only"
+  },
+  "verification": {
+    "price_check": "unverified",
+    "method": null
+  }
+}

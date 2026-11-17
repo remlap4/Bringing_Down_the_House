@@ -1,0 +1,111 @@
+{
+  "reviewed_on": "2026-11-17",
+  "scope": "local public-browser feasibility, not operational adapters or availability guarantees",
+  "sources": [
+    {
+      "id": "draftkings",
+      "priority": 1,
+      "role": "comparison",
+      "decision": "retain_existing_adapter",
+      "availability": "live capture and price verification passed",
+      "observed_nba_events": 5,
+      "markets_observed": [
+        "moneyline",
+        "spread",
+        "total"
+      ],
+      "freshness": "observation time known; book update time unknown",
+      "parser_effort": "existing moneyline parser and independent visible-text check",
+      "rules": "basketball/general pages reviewed; per-quote binding and cross-book compatibility still pending",
+      "evidence": [
+        {
+          "path": "data/20261117T220307433822Z",
+          "captured_at_utc": "2026-11-17T22:03:11.954Z",
+          "html_sha256": "71b46922c59d40fe0c9fee83cb7ec64822b1b6c182ba37364100edd7fe651998"
+        }
+      ]
+    },
+    {
+      "id": "pinnacle",
+      "priority": 1,
+      "role": "reference",
+      "decision": "selected_for_adapter_build",
+      "availability": "public headed Chromium display captured twice without login",
+      "observed_nba_events": 5,
+      "markets_observed": [
+        "moneyline",
+        "spread",
+        "total"
+      ],
+      "freshness": "two observations about 90 seconds apart; source update time and underlying latency unknown",
+      "parser_effort": "moderate; event URLs and data-test-id=moneyline available; generated CSS classes; generic aria-labels also say Money Line on spread/total buttons",
+      "rules": "overtime inclusion reviewed; interruption/void rules differ from DraftKings; no automatic equivalence",
+      "evidence": [
+        {
+          "path": "data/source_probes/20261117T220715457430Z_pinnacle",
+          "url": "https://www.pinnacle.com/en/basketball/nba/matchups/#all",
+          "captured_at_utc": "2026-11-17T22:07:21.548Z",
+          "html_sha256": "3da37a5269961c4af24d10a02b77246931c51cc67f5a33408fd2f3d96d29d3d0",
+          "http_status": 200
+        },
+        {
+          "path": "data/source_probes/20261117T220845739482Z_pinnacle_37bb04d9",
+          "url": "https://www.pinnacle.com/en/basketball/nba/matchups/#all",
+          "captured_at_utc": "2026-11-17T22:08:51.093Z",
+          "html_sha256": "885aa849f2d5ed0dac1932e8b0c3e9e34bb667967e208a938c4a4f3df63a6abc",
+          "http_status": 200
+        }
+      ]
+    },
+    {
+      "id": "fanduel",
+      "priority": 2,
+      "role": "comparison_candidate",
+      "decision": "preferred_third_book_after_core_pipeline",
+      "availability": "public NBA board rendered; no parser verification yet",
+      "observed_nba_events": 5,
+      "markets_observed": [
+        "moneyline",
+        "spread",
+        "total"
+      ],
+      "freshness": "capture time known; source update time unknown",
+      "parser_effort": "moderate estimate; separate columns and participant names; adapter not built",
+      "rules": "full jurisdiction-specific house-rule review pending; landing-page FAQ alone insufficient",
+      "evidence": [
+        {
+          "path": "data/source_probes/20261117T220851292602Z_fanduel_6e2b3bca",
+          "url": "https://sportsbook.fanduel.com/navigation/nba",
+          "captured_at_utc": "2026-11-17T22:08:56.627Z",
+          "html_sha256": "9b24212eb9a7e5b1aebf707cb3a1fd9788e2d6b9597fa1c495b124e9559a2a7b",
+          "http_status": 200
+        }
+      ]
+    },
+    {
+      "id": "betway",
+      "priority": 3,
+      "role": "comparison_candidate",
+      "decision": "defer_behind_fanduel",
+      "availability": "prices rendered on en-ca route; location prompt shown and not answered",
+      "observed_nba_events": 5,
+      "markets_observed": [
+        "moneyline",
+        "spread",
+        "total"
+      ],
+      "freshness": "capture time known; source update time unknown",
+      "parser_effort": "moderate-to-high estimate; prompts, region routing, schedule discrepancy",
+      "rules": "not reviewed; 10-minute earlier displayed start times than Pinnacle/FanDuel require explicit matching policy",
+      "evidence": [
+        {
+          "path": "data/source_probes/20261117T220857141161Z_betway_642390f1",
+          "url": "https://betway.com/g/en-ca/sports/grp/basketball/usa/nba",
+          "captured_at_utc": "2026-11-17T22:09:01.810Z",
+          "html_sha256": "4b96fecbe5e9e78ea878667c19f6a356d7a308893b9c86e65246628197441280",
+          "http_status": 200
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "pages": [
+    {"id": "pinnacle", "url": "https://www.pinnacle.com/en/basketball/nba/matchups/", "role": "reference"},
+    {"id": "draftkings", "url": "https://sportsbook.draftkings.com/leagues/basketball/nba", "role": "comparison"},
+    {"id": "pinnacle_rules", "url": "https://www.pinnacle.com/en/future/betting-rules", "role": "rules"},
+    {"id": "draftkings_rules", "url": "https://sportsbook.draftkings.com/help/sport-rules/basketball", "role": "rules"},
+    {"id": "draftkings_general_rules", "url": "https://sportsbook.draftkings.com/help/general-betting-rules", "role": "rules"},
+    {"id": "fanduel", "url": "https://sportsbook.fanduel.com/navigation/nba", "role": "comparison_candidate"},
+    {"id": "betway", "url": "https://betway.com/g/en/sports/grp/basketball/usa/nba", "role": "comparison_candidate"}
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "source_evidence": {
+    "path": "data/source_probes/20261117T220845739482Z_pinnacle_37bb04d9",
+    "url": "https://www.pinnacle.com/en/basketball/nba/matchups/#all",
+    "captured_at_utc": "2026-11-17T22:08:51.093Z",
+    "html_sha256": "885aa849f2d5ed0dac1932e8b0c3e9e34bb667967e208a938c4a4f3df63a6abc",
+    "http_status": 200
+  },
+  "scope": "One reduced observed row with spread, moneyline and total controls. Not a complete-page parser fixture; no independent price verification claimed.",
+  "event_id": "1640325352",
+  "participants_in_display_order": [
+    "New York Knicks",
+    "Toronto Raptors"
+  ],
+  "displayed_moneyline_decimal_strings": [
+    "1.595",
+    "2.480"
+  ],
+  "parser_note": "Use the moneyline container; aria-label Money Line also appears on other market buttons. Do not infer full-game status, timezone, or overtime solely from this row."
+}

@@ -9,9 +9,15 @@ def verify(folder):
     folder = Path(folder)
     (folder / 'verification.json').unlink(missing_ok=True)
     records = [json.loads(line) for line in (folder / 'quotes.jsonl').read_text(encoding='utf-8').splitlines()]
+    result = verify_records(records, (folder / 'visible.txt').read_text(encoding='utf-8'))
+    (folder / 'verification.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
+    print(f"PASS: {result['validated_events']} events / {result['validated_selections']} prices match rendered text.")
+    return result
+
+
+def verify_records(records, text):
     if not records:
         raise ValueError('No quotes to verify')
-    text = (folder / 'visible.txt').read_text(encoding='utf-8')
     text = '\n'.join(line.strip() for line in text.splitlines() if line.strip())
     checks = []
     for record in records:
@@ -36,11 +42,8 @@ def verify(folder):
         if label and label not in lines:
             raise ValueError(f"{record['event_id']}: schedule label not in rendered text")
         checks.append({'event_id': record['event_id'], 'teams': [a, b], 'moneylines': actual, 'matched': True})
-    result = {'validated_events': len(checks), 'validated_selections': len(checks) * 2,
+    return {'validated_events': len(checks), 'validated_selections': len(checks) * 2,
               'method': 'Event-bound rendered text; six-price board order; separate score lines', 'checks': checks}
-    (folder / 'verification.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
-    print(f'PASS: {len(checks)} events / {len(checks)*2} prices match rendered text.')
-    return result
 
 
 if __name__ == '__main__':

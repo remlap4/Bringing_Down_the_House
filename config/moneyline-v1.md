@@ -2,8 +2,8 @@
 
 `moneyline_contract.validate_observation()` is the executable contract; the JSON
 fixture in `tests/fixtures/moneyline-v1.json` is entirely synthetic. This document
-specifies the persisted observation boundary for Day 3. It does not change the
-current collector's JSONL format. Conversion and historical ingestion are next.
+specifies the persisted observation boundary. The collector emits source-specific
+JSONL. The offline converter in `history.py` writes the normalized archive.
 
 One observation contains the complete two-selection market at one capture time.
 Every field in the fixture is required; unresolved values use explicit nulls.
@@ -34,18 +34,19 @@ later than capture; capture start cannot be later than observation. A known
 pregame start must be later than observation. Live/final/unknown observations may
 be retained for history and must be filtered out by the future pregame engine.
 
-For Day 3: derive a deterministic observation ID from source, original evidence
+Storage derives a deterministic observation ID from source, original evidence
 hash, source event/market identity, capture time, parser version and schema
 version. Reimporting that observation is idempotent. A later capture is distinct
 even if prices do not move. A changed parse produces a new version linked to the
 superseded observation in the storage layer, rather than overwriting history.
-Run manifests will hold batch checksums, completion status, and device identity;
-those belong to the storage envelope rather than each quote.
+Run manifests hold batch checksums, completion status, and device identity.
+These fields describe the batch as a whole.
 
 Validation is structural and semantic consistency only. It does not authenticate
-source data or certify EV eligibility. Future importers must verify evidence and
-price-check claims themselves; future matching must resolve canonical events,
-rule applicability and reviewed cross-book compatibility. The validator does not
+source data or certify EV eligibility. Snapshot conversion verifies the HTML
+hash and checks odds against rendered text. Archive ingestion checks internal
+consistency using the recorded hashes. Canonical events, rule applicability,
+and cross-book compatibility still require explicit review. The validator does not
 look up rule IDs or infer that two books share settlement behavior.
 
 Examples/checks:

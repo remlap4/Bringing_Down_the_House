@@ -105,7 +105,7 @@ books include overtime for standard full-game NBA moneylines, but interruption
 and void conditions differ. These profiles do not automatically assign rules to
 existing quotes or approve cross-book comparisons.
 
-The next storage layer will use the v1 observation contract described in
+Historical storage uses the v1 observation contract described in
 `config/moneyline-v1.md` and enforced by `moneyline_contract.py`:
 
 ```sh
@@ -116,5 +116,47 @@ The next storage layer will use the v1 observation contract described in
 The JSON fixture is synthetic. The small Pinnacle HTML fixture is a reduced
 observed row for future parser work, not a live offer. Contract validation checks
 structure, timestamps, outcome identity, and price consistency; it does not
-certify EV eligibility. Existing collector JSONL is unchanged, and conversion,
-SQLite ingestion, and shared archive batches are not implemented yet.
+certify EV eligibility. The collector continues to emit its source-specific JSONL.
+
+## Offline history storage
+
+Use the project Python environment from setup and run these commands from the
+repository root. Substitute the folder of an existing DraftKings capture.
+Archiving and ingestion work offline.
+
+```sh
+.venv/bin/python history.py archive-snapshot data/YOUR_SNAPSHOT --device local
+.venv/bin/python history.py ingest
+.venv/bin/python history.py ingest --database data/local/rebuilt.sqlite
+```
+
+Archiving requires `metadata.json` with a matching HTML SHA-256 and UTC capture
+times, `page.html`, and `visible.txt`. The converter reparses the saved HTML and
+checks the price pairs against the saved rendered text. It leaves the original
+snapshot files intact. Captures missing required evidence or failing verification
+are rejected. Use a stable, non-sensitive device label. For snapshots outside
+the repository, supply a portable repository-relative evidence reference with
+`--evidence-path`. Review archive metadata before sharing it.
+
+The converter writes one immutable JSONL batch under
+`archive/odds/YYYY/MM/DD/draftkings/` and publishes its completion manifest under
+`archive/runs/YYYY/MM/DD/` after the batch is ready. The archive filesystem must
+support hard links for atomic publication. Repeating conversion with the same
+metadata gives the same files. A later capture is retained even if its prices
+are unchanged. A parser revision can point to the previous manifest for the
+same capture with `--supersedes`, preserving both versions.
+
+Ingestion checks manifests, SHA-256 hashes, row counts, IDs, and observation
+schema before committing the imports and their ledger to SQLite. It ignores
+batches without completion manifests and errors on corrupt or missing files
+referenced by a manifest. Repeating ingestion skips already imported batches.
+To verify a clean rebuild, choose a fresh database path and compare the printed
+counts and logical SHA-256 values for the imports and observations tables.
+The default database and raw evidence live under the Git-ignored `data/`
+directory. The archive can rebuild the database using its normalized rows.
+Rechecking the original prices requires the original evidence.
+
+SQLite's `observations` table retains legacy quotes with unresolved rules. The
+`analysis_observations` view excludes quotes with unverified rules and linked
+superseded observations. Further checks for event identity, rule applicability,
+cross-book compatibility, and freshness are required for analysis.

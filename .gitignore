@@ -7,4 +7,6 @@ data/
 .python/
 .cache/
 
-ROADMAP.md
+/scripts/
+/.daily-work/
+/ROADMAP.md

@@ -193,10 +193,10 @@ def save_snapshot(folder, html, metadata):
     (folder / 'metadata.json').write_text(json.dumps(metadata, indent=2), encoding='utf-8')
 
 
-def capture(args):
-    stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
-    folder = Path(args.output) / stamp
+def capture_snapshot(args, folder):
+    """Save source evidence before parsing or publishing any observations."""
     started = utc_now()
+    status_scope = 'target_navigation'
     if args.method == 'http':
         request = Request(URL, headers={'User-Agent': 'NBAResearchCollector/0.1', 'Accept': 'text/html'})
         with urlopen(request, timeout=30) as response:
@@ -213,8 +213,13 @@ def capture(args):
                 page = browser.new_page(viewport={'width': 1440, 'height': 1000})
                 if args.via_home:
                     response = page.goto('https://sportsbook.draftkings.com/', wait_until='domcontentloaded', timeout=45000)
-                    page.locator('a[href="/leagues/basketball/nba"]').first.click(timeout=30000)
-                    page.wait_for_url(URL, timeout=30000)
+                    if response is not None and response.status >= 400:
+                        status_scope = 'homepage_navigation'
+                    else:
+                        with page.expect_navigation(url=URL, wait_until='domcontentloaded',
+                                                    timeout=30000) as navigation:
+                            page.locator('a[href="/leagues/basketball/nba"]').first.click(timeout=30000)
+                        response = navigation.value
                 else:
                     response = page.goto(URL, wait_until='domcontentloaded', timeout=45000)
                 if response is not None and response.status < 400:
@@ -233,7 +238,7 @@ def capture(args):
             finally:
                 browser.close()
     metadata = {'requested_url': URL, 'final_url': final_url, 'http_status': status,
-                'http_status_scope': 'homepage_navigation' if args.method == 'browser' and args.via_home else 'target_navigation',
+                'http_status_scope': status_scope,
                 'browser_channel': args.channel if args.method == 'browser' else None,
                 'headed': args.headed if args.method == 'browser' else None,
                 'via_home': args.via_home if args.method == 'browser' else None,
@@ -246,7 +251,15 @@ def capture(args):
     if args.method == 'browser':
         (folder / 'visible.txt').write_text(visible_text, encoding='utf-8')
         (folder / 'page.png').write_bytes(screenshot)
+    return metadata
+
+
+def capture(args):
+    stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
+    folder = Path(args.output) / stamp
+    metadata = capture_snapshot(args, folder)
     print(f'Saved HTML and metadata: {folder}')
+    status = metadata['http_status']
     if status is not None and status >= 400:
         (folder / 'report.json').write_text(json.dumps({'status':'capture_failed', 'http_status':status,
             'error':'Source returned an HTTP error; snapshot retained, no odds emitted.'}, indent=2), encoding='utf-8')

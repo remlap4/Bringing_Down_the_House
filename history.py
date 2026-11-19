@@ -1,6 +1,7 @@
 """Archive verified DraftKings snapshots and ingest normalized history offline."""
 import argparse
 from contextlib import closing
+from dataclasses import dataclass
 import hashlib
 import json
 import os
@@ -126,7 +127,19 @@ def normalize(record, run_id, parser_version, captured, started, verification, e
     return validate_observation(observation)
 
 
+@dataclass(frozen=True)
+class PublishedBatch:
+    manifest: Path
+    observations: int
+    verified_pregame: int
+    issues: list[str]
+
+
 def archive_snapshot(snapshot, archive, device, evidence_path, supersedes=None):
+    return archive_draftkings(snapshot, archive, device, evidence_path, supersedes).manifest
+
+
+def archive_draftkings(snapshot, archive, device, evidence_path, supersedes=None):
     string(device, 'device label')
     metadata = json.loads((snapshot / 'metadata.json').read_text(encoding='utf-8'))
     require(isinstance(metadata, dict), 'Expected snapshot metadata object')
@@ -136,7 +149,7 @@ def archive_snapshot(snapshot, archive, device, evidence_path, supersedes=None):
             'Expected a DraftKings snapshot')
     status = metadata.get('http_status')
     require(status is None or type(status) is int and 200 <= status < 400,
-            'Snapshot has an unsuccessful HTTP status')
+            f'Snapshot has an unsuccessful HTTP status ({status})')
     html = (snapshot / 'page.html').read_text(encoding='utf-8')
     digest = sha(html.encode('utf-8'))
     require(metadata.get('html_sha256') == digest, 'Snapshot HTML hash missing or mismatched')
@@ -168,7 +181,8 @@ def archive_snapshot(snapshot, archive, device, evidence_path, supersedes=None):
     # A manifest is the completion marker. Discovery ignores orphaned batch files.
     atomic_publish(archive / batch_path, batch)
     atomic_publish(archive / manifest_path, encode(manifest))
-    return archive / manifest_path
+    return PublishedBatch(archive / manifest_path, len(records),
+                          parsed['pregame_eligible_count'], parsed['issues'])
 
 
 def load_batch(archive, path):
@@ -241,7 +255,7 @@ def database_summary(connection):
     return counts
 
 
-def ingest(archive, database):
+def ingest(archive, database, *, manifest_path=None):
     database.parent.mkdir(parents=True, exist_ok=True)
     with closing(sqlite3.connect(database)) as connection:
         connection.execute('PRAGMA foreign_keys = ON')
@@ -249,7 +263,10 @@ def ingest(archive, database):
         # One transaction permits predecessor batches to appear in any file order.
         with connection:
             connection.execute('BEGIN IMMEDIATE')
-            for path in sorted((archive / 'runs').glob('*/*/*/*.json')):
+            # A collection imports its own batch even if unrelated archive files need repair.
+            paths = ([manifest_path] if manifest_path is not None else
+                     sorted((archive / 'runs').glob('*/*/*/*.json')))
+            for path in paths:
                 manifest, digest, records = load_batch(archive, path)
                 batch_id = manifest['batch_id']
                 ledger = (batch_id, digest, manifest['batch_sha256'], manifest['row_count'],

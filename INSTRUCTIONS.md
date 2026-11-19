@@ -9,7 +9,7 @@ From a terminal in this repository:
 
 ```sh
 ./setup.sh
-./run.sh
+.venv/bin/python run.py collect --sport nba
 ```
 
 Setup creates `.venv`, installs the pinned dependencies, and downloads Playwright's
@@ -20,7 +20,9 @@ If neither compatible Python nor uv is installed, setup explains what is missing
 An existing Windows `.venv` cannot be reused on Unix; move it aside before setup.
 Do not copy virtual environments between devices.
 
-Each run opens Chromium and saves a timestamped snapshot under `data/`. No shell
+Use the command above for collection through SQLite import. For a standalone
+DraftKings snapshot and source-specific outputs, use `./run.sh`. The standalone
+launcher opens Chromium and saves a timestamped snapshot under `data/`. No shell
 activation is needed. Both scripts resolve paths from their own location, so they
 also work when launched by absolute path from another directory. Relative
 `--output` paths are relative to the repository. Internet access is needed for
@@ -49,7 +51,38 @@ are ignored by Git. The existing PowerShell scripts remain available on Windows:
 `./setup.ps1`, then `./run.ps1` (requires installed Edge). The Python collector and
 pinned dependencies are shared across platforms.
 
-## Results
+## Collect into history
+
+Run from the repository root. Use `./.venv/Scripts/python.exe run.py collect --sport
+nba --channel msedge` on Windows after PowerShell setup. The command opens a visible
+browser by default and goes directly to the DraftKings NBA page. Use `--via-home`
+to follow the NBA link from the homepage. Use `--headless` to run without a visible
+window or `--channel chrome` or `--channel msedge` to use an installed browser.
+Direct navigation has been exercised with mocked browser responses.
+
+Choose a stable, non-sensitive `--device` label for each machine sharing an archive.
+It defaults to `local`. Raw evidence goes under `data/raw/`. Use `--archive` and
+`--database` to override `archive/` and `data/local/odds.sqlite`.
+
+The collector checks the HTML hash, independently verifies the parsed moneylines
+against rendered text, and validates the normalized observations before publishing
+the batch. The JSON report on stdout includes each source's status, snapshot path,
+published manifest when available, observation counts, and parser issues. The
+archived observation count includes all accepted statuses. The verified pregame
+count covers future events with a resolved start time and two available prices.
+Settlement rules remain unverified.
+
+Exit code 0 means every selected source was archived and imported. Review any
+parser issues for excluded markets. Exit code 1 means a source failed, with the
+stage and reason in its report. Other sources can still finish. A capture that
+fails validation leaves its evidence available for inspection. An interruption
+before manifest publication can leave an orphan batch, which ingestion ignores.
+If SQLite import fails after the completion manifest is written, the verified
+archive remains available for retry with `history.py ingest` and the same paths.
+Collection imports each newly published batch individually. Use the offline
+ingest command below to import the rest of an archive.
+
+## Standalone snapshot results
 
 - `quotes.jsonl`: validated two-selection moneyline cards, including live and unknown-status events. Team names exclude scoreboard text; scores are in `scores_in_display_order`.
 - `pregame_quotes.jsonl`: only future, pregame events with a resolved UTC start and two available prices, emitted after all parsed quotes pass rendered-text verification. An empty file means no eligible events; an absent file means verification was unavailable or failed.

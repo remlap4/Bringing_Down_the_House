@@ -31,8 +31,10 @@ queries, and Python's **unittest** framework checks data handling and failure ca
 
 ## Current scope
 
-DraftKings NBA moneyline collection, price verification, and offline historical
-storage are implemented. Other sportsbook displays have been explored, but
+From the repository root, `python run.py collect --sport nba` uses the configured
+Python environment to capture DraftKings NBA moneylines, verify prices against
+rendered text, archive the observations, and import them into SQLite. The command
+reports the outcome and any issues for each source. Other sportsbook displays have been explored, but
 Pinnacle collection, cross-book matching, and the +EV analysis engine remain under
 development.
 

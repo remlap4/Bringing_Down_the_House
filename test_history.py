@@ -1,7 +1,12 @@
+import csv
+import io
 import json
 from pathlib import Path
+import shutil
 import sqlite3
 import tempfile
+import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -50,6 +55,110 @@ class HistoryTests(unittest.TestCase):
             self.assertEqual(payloads[0]['selections'], payloads[1]['selections'])
             self.assertIsNone(payloads[0]['market']['settlement_rule_id'])
             self.assertEqual(connection.execute('SELECT count(*) FROM analysis_observations').fetchone(), (0,))
+
+    def test_device_handoff_commands(self):
+        # Separate working directories mirror devices with independent SQLite and raw evidence.
+        roots = [self.root / device for device in ('device-a', 'device-b')]
+        entry = Path(history.__file__).resolve()
+
+        def command(root, *args, succeeds=True):
+            result = subprocess.run([sys.executable, str(root / entry.name), *args], cwd=root,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0 if succeeds else 1, result.stderr)
+            return result.stdout if succeeds else result.stderr
+
+        archives = []
+        for index, root in enumerate(roots):
+            snapshot = root / 'data' / 'snapshot'
+            snapshot.mkdir(parents=True)
+            for module in ('history.py', 'moneyline_contract.py', 'scraper.py', 'verify_snapshot.py'):
+                shutil.copyfile(entry.with_name(module), root / module)
+            (snapshot / 'page.html').write_text(self.html, encoding='utf-8')
+            (snapshot / 'visible.txt').write_text(self.visible, encoding='utf-8')
+            metadata = {**self.metadata, 'captured_at_utc': f'2026-11-07T23:0{index}:00Z'}
+            (snapshot / 'metadata.json').write_text(json.dumps(metadata), encoding='utf-8')
+            command(root, 'archive-snapshot', 'data/snapshot', '--device', root.name)
+            self.assertEqual(json.loads(command(root, 'ingest'))['observations']['count'], 1)
+            archive = root / 'archive'
+            archives.append({path.relative_to(archive): path.read_bytes()
+                             for path in archive.rglob('*') if path.is_file()})
+
+        self.assertTrue(archives[0].keys().isdisjoint(archives[1]))
+        summaries, exports = [], []
+        for root, incoming in zip(roots, reversed(archives)):
+            # Transfer only immutable text paths, as a Git merge would.
+            for relative, content in incoming.items():
+                target = root / 'archive' / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with target.open('xb') as handle:
+                    handle.write(content)
+            self.assertEqual(json.loads(command(root, 'check-archive'))['batches'], 2)
+            summary = json.loads(command(root, 'ingest'))
+            self.assertEqual(json.loads(command(root, 'ingest')), summary)
+            self.assertEqual(json.loads(command(root, 'rebuild')), summary)
+            self.assertEqual(json.loads(command(root, 'rebuild', '--database', 'data/fresh.sqlite')),
+                             summary)
+            summaries.append(summary)
+            exports.append(command(root, 'export'))
+        self.assertEqual(summaries[0], summaries[1])
+        self.assertEqual(summaries[0]['imports']['count'], 2)
+        self.assertEqual(summaries[0]['observations']['count'], 2)
+        self.assertEqual(exports[0], exports[1])
+        rows = list(csv.DictReader(io.StringIO(exports[0])))
+        self.assertEqual(len(rows), 4)
+        self.assertEqual({row['participant'] for row in rows}, {'OKC Thunder', 'CLE Cavaliers'})
+        self.assertEqual({row['odds_text'] for row in rows}, {'+150', '−179'})
+        self.assertEqual({row['rule_status'] for row in rows}, {'unverified'})
+
+        for relative in archives[1]:
+            (roots[0] / 'archive' / relative).unlink()
+        self.assertEqual(json.loads(command(roots[0], 'ingest'))['observations']['count'], 2)
+        self.assertEqual(json.loads(command(roots[0], 'rebuild'))['observations']['count'], 1)
+
+        self.assertIn('unable to open database', command(roots[0], 'export', '--database',
+                                                         'missing.sqlite', succeeds=False))
+        self.assertFalse((roots[0] / 'missing.sqlite').exists())
+
+    def test_failed_rebuild_keeps_existing_history(self):
+        path = self.publish()
+        original = history.ingest(self.archive, self.database)
+        batch = self.archive / history.archive_paths(json.loads(path.read_bytes()))[0]
+        content = batch.read_bytes()
+        for corrupt in (True, False):
+            if corrupt:
+                batch.write_bytes(content + b'x')
+            else:
+                batch.unlink()
+            with self.assertRaises((ValueError, FileNotFoundError)):
+                history.ingest(self.archive, self.database, rebuild=True)
+            with sqlite3.connect(self.database) as connection:
+                self.assertEqual(history.database_summary(connection), original)
+
+    def test_archive_sharing_checks(self):
+        path = self.publish()
+        manifest = json.loads(path.read_bytes())
+        batch = self.archive / history.archive_paths(manifest)[0]
+        size = path.stat().st_size + batch.stat().st_size
+        self.assertEqual(history.check_archive(self.archive)['bytes'], size)
+        with patch.object(history, 'ARCHIVE_REVIEW_BYTES', size):
+            with self.assertRaisesRegex(ValueError, '250 MiB'):
+                history.check_archive(self.archive)
+        with patch.object(history, 'BATCH_REVIEW_BYTES', batch.stat().st_size):
+            with self.assertRaisesRegex(ValueError, '10 MiB'):
+                history.check_archive(self.archive)
+        manifest['device'] = 'api_key=synthetic-test-value'
+        path.write_bytes(history.encode(manifest))
+        with self.assertRaisesRegex(ValueError, 'possible credential') as error:
+            history.check_archive(self.archive)
+        self.assertNotIn('synthetic-test-value', str(error.exception))
+        path.unlink()
+        with self.assertRaisesRegex(ValueError, 'without a completion manifest'):
+            history.check_archive(self.archive)
+        self.publish()
+        extra = self.archive / 'database.sqlite'
+        extra.touch()
+        with self.assertRaisesRegex(ValueError, 'Unexpected archive file'):
+            history.check_archive(self.archive)
 
     def test_snapshot_evidence_must_be_verified(self):
         text = self.snapshot / 'visible.txt'

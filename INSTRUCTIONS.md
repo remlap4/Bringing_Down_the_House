@@ -156,12 +156,13 @@ certify EV eligibility. The collector continues to emit its source-specific JSON
 
 Use the project Python environment from setup and run these commands from the
 repository root. Substitute the folder of an existing DraftKings capture.
-Archiving and ingestion work offline.
+All history commands work offline.
 
 ```sh
 .venv/bin/python history.py archive-snapshot data/YOUR_SNAPSHOT --device local
 .venv/bin/python history.py ingest
-.venv/bin/python history.py ingest --database data/local/rebuilt.sqlite
+.venv/bin/python history.py rebuild --database data/local/rebuilt.sqlite
+.venv/bin/python history.py export > data/local/odds.csv
 ```
 
 Archiving requires `metadata.json` with a matching HTML SHA-256 and UTC capture
@@ -184,11 +185,48 @@ Ingestion checks manifests, SHA-256 hashes, row counts, IDs, and observation
 schema before committing the imports and their ledger to SQLite. It ignores
 batches without completion manifests and errors on corrupt or missing files
 referenced by a manifest. Repeating ingestion skips already imported batches.
-To verify a clean rebuild, choose a fresh database path and compare the printed
-counts and logical SHA-256 values for the imports and observations tables.
-The default database and raw evidence live under the Git-ignored `data/`
-directory. The archive can rebuild the database using its normalized rows.
+`rebuild` recreates the history rows in one transaction using only the contents
+of an existing archive directory. With the default database path, this replaces
+local history, including removing rows whose batches are absent from the
+archive. If import fails, existing history is preserved. For recovery from a
+damaged SQLite file or to compare databases, choose a new `--database` path.
+Compare the printed counts and logical SHA-256 values for the imports and
+observations tables across devices. An existing empty archive rebuilds to zero
+rows. Use the global `--archive PATH` option before the subcommand to select an
+alternate archive.
+
+`export` writes UTF-8 CSV to standard output. It reads the selected SQLite database and emits one row per
+selection, including unavailable sides and superseded or unreviewed records.
+Treat source text and odds as text when importing into a spreadsheet. Save
+exports, databases, and raw evidence under the Git-ignored `data/` directory.
 Rechecking the original prices requires the original evidence.
+
+### Synchronize history across devices
+
+1. Finish or pause local collection and confirm a clean working tree with
+   `git status --short`. Pull committed changes with `git pull --ff-only`,
+   then run `.venv/bin/python history.py ingest`. Keep any unshared local
+   captures if the pull fails.
+2. Collect with a stable, non-sensitive device label. Before staging, run
+   `.venv/bin/python history.py check-archive`. The check reports batch count,
+   total bytes, and largest file size. It rejects missing pairs, invalid files,
+   unexpected files or symlinks, source URLs with queries or fragments, and
+   common credential patterns. It also stops at 10 MiB per file or 250 MiB for
+   the archive so storage can be reviewed before adding more.
+3. Review the exact manifest and JSONL contents for secrets and personal data.
+   Automated checks are heuristic. Stage only the two reviewed files per batch
+   with `git add -- <manifest-path> <batch-path>`, review `git diff --cached`,
+   then commit and push those files. Keep local data, raw HTML, reports, and
+   SQLite files out of the commit.
+4. On the receiving checkout, pull with `git pull --ff-only`, then ingest or
+   rebuild. If both devices committed distinct batches and the push is rejected,
+   fetch and merge the other device's changes while retaining both archive
+   pairs. Run the archive check and ingest again before pushing. If the same
+   immutable path has different bytes, investigate the conflict before sharing.
+
+Collection, archive checks, import, rebuild, and export are separate from Git
+synchronization. The local handoff test uses independent directories and offline
+captures. Physical second-device verification is pending.
 
 SQLite's `observations` table retains legacy quotes with unresolved rules. The
 `analysis_observations` view excludes quotes with unverified rules and linked

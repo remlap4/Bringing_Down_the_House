@@ -1,5 +1,6 @@
 """Archive verified DraftKings snapshots and ingest normalized history offline."""
 import argparse
+import csv
 from contextlib import closing
 from dataclasses import dataclass
 import hashlib
@@ -8,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import sys
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlparse
 
@@ -255,7 +257,9 @@ def database_summary(connection):
     return counts
 
 
-def ingest(archive, database, *, manifest_path=None):
+def ingest(archive, database, *, manifest_path=None, rebuild=False):
+    if rebuild:
+        require(archive.is_dir(), 'Rebuild requires an existing archive directory')
     database.parent.mkdir(parents=True, exist_ok=True)
     with closing(sqlite3.connect(database)) as connection:
         connection.execute('PRAGMA foreign_keys = ON')
@@ -263,6 +267,10 @@ def ingest(archive, database, *, manifest_path=None):
         # One transaction permits predecessor batches to appear in any file order.
         with connection:
             connection.execute('BEGIN IMMEDIATE')
+            if rebuild:
+                # Keep replacement rows and deletion of the old history in the same transaction.
+                connection.execute('DELETE FROM observations')
+                connection.execute('DELETE FROM imports')
             # A collection imports its own batch even if unrelated archive files need repair.
             paths = ([manifest_path] if manifest_path is not None else
                      sorted((archive / 'runs').glob('*/*/*/*.json')))
@@ -303,6 +311,84 @@ def ingest(archive, database, *, manifest_path=None):
 
 
 
+# Conservative review thresholds for Git transport, independent of local ingestion.
+BATCH_REVIEW_BYTES = 10 * 1024**2
+ARCHIVE_REVIEW_BYTES = 250 * 1024**2
+SECRET_PATTERN = re.compile(
+    r'-----BEGIN [A-Z ]*PRIVATE KEY-----'
+    r'|\b(?:AKIA|ASIA)[A-Z0-9]{16}\b'
+    r'|\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b'
+    r'|\bBearer\s+[A-Za-z0-9._~+/-]{8,}'
+    r'|\b(?:api[_-]?key|(?:access|refresh|auth|session)[_-]?token|token|'
+    r'password|secret|client[_-]?secret|cookie|authorization)\s*[:=]\s*\S',
+    re.IGNORECASE,
+)
+
+
+def check_archive(archive):
+    """Check the complete shareable tree before selecting files for Git."""
+    require(archive.is_dir() and not archive.is_symlink(), 'Expected a regular archive directory')
+    files = set()
+    manifests = []
+    total = 0
+    largest = 0
+    for path in sorted(archive.rglob('*')):
+        relative = path.relative_to(archive).as_posix()
+        require(not path.is_symlink(), f'Unexpected archive symlink: {relative}')
+        if path.is_dir():
+            continue
+        manifest = re.fullmatch(r'runs/\d{4}/\d{2}/\d{2}/[0-9a-f]{64}\.json', relative)
+        batch = re.fullmatch(r'odds/\d{4}/\d{2}/\d{2}/[a-z0-9_-]+/[0-9a-f]{64}\.jsonl', relative)
+        require(path.is_file() and (manifest or batch), f'Unexpected archive file: {relative}')
+        size = path.stat().st_size
+        require(size < BATCH_REVIEW_BYTES, f'Archive file reached the 10 MiB review threshold: {relative}')
+        total += size
+        require(total < ARCHIVE_REVIEW_BYTES, 'Archive reached the 250 MiB review threshold')
+        largest = max(largest, size)
+        files.add(path)
+        if manifest:
+            manifests.append(path)
+
+    expected = set()
+    for path in manifests:
+        manifest, _, records = load_batch(archive, path)
+        batch_path, _ = archive_paths(manifest)
+        expected.update((path, archive / batch_path))
+        # Refuse URL query strings and fragments because arbitrary parameter names can carry credentials.
+        for record in records:
+            source_url = urlparse(record['source_url'])
+            require(not (source_url.query or source_url.fragment),
+                    f'{path}: source URL contains query or fragment')
+        require(not any(SECRET_PATTERN.search(encode(value).decode('utf-8'))
+                        for value in (manifest, *records)),
+                f'{path}: possible credential in archive metadata or observations')
+    require(files == expected, 'Archive contains a batch without a completion manifest')
+    return {'batches': len(manifests), 'bytes': total, 'largest_file_bytes': largest}
+
+
+def export_csv(database, output):
+    """Stream one row per selection in stable observation and participant order."""
+    with closing(sqlite3.connect(database.resolve().as_uri() + '?mode=ro', uri=True)) as connection:
+        rows = connection.execute('SELECT batch_id, payload FROM observations ORDER BY observation_id')
+        writer = csv.writer(output, lineterminator='\n')
+        writer.writerow(('batch_id', 'observation_id', 'observed_at_utc', 'source', 'bookmaker',
+                         'source_event_id', 'scheduled_start_utc', 'event_status', 'market_type',
+                         'rule_status', 'participant_index', 'participant', 'odds_text',
+                         'odds_format', 'decimal_odds', 'selection_status'))
+        for batch_id, payload in rows:
+            record = json.loads(payload)
+            event = record['event']
+            market = record['market']
+            for selection in sorted(record['selections'], key=lambda item: item['participant_index']):
+                index = selection['participant_index']
+                writer.writerow((batch_id, record['observation_id'], record['observed_at_utc'],
+                                 record['source'], record['bookmaker'], event['source_event_id'],
+                                 event['scheduled_start_utc'], event['status'], market['type'],
+                                 market['rule_status'], index, event['participants'][index]['source_name'],
+                                 selection['odds_text'], selection['odds_format'],
+                                 selection['decimal_odds'], selection['status']))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--archive', type=Path, default=Path('archive'))
@@ -312,8 +398,14 @@ def main():
     snapshot.add_argument('--device', required=True, help='Stable, non-sensitive capture device label')
     snapshot.add_argument('--evidence-path', help='Repository-relative path to the original page.html')
     snapshot.add_argument('--supersedes', type=Path, help='Prior manifest for the same capture')
-    ingestion = commands.add_parser('ingest')
-    ingestion.add_argument('--database', type=Path, default=Path('data/local/odds.sqlite'))
+    commands.add_parser('check-archive', help='Check completeness, size and common credential patterns')
+    for command, help_text in (
+        ('ingest', 'Import complete batches into local history'),
+        ('rebuild', 'Replace local history transactionally from complete batches'),
+        ('export', 'Write historical selections as CSV to standard output'),
+    ):
+        database_command = commands.add_parser(command, help=help_text)
+        database_command.add_argument('--database', type=Path, default=Path('data/local/odds.sqlite'))
     args = parser.parse_args()
     try:
         if args.command == 'archive-snapshot':
@@ -322,8 +414,14 @@ def main():
                 evidence_path = (args.snapshot.resolve() / 'page.html').relative_to(Path.cwd()).as_posix()
             print(archive_snapshot(args.snapshot, args.archive.resolve(), args.device, evidence_path,
                                    args.supersedes.resolve() if args.supersedes else None))
+        elif args.command == 'check-archive':
+            print(json.dumps(check_archive(args.archive), sort_keys=True))
+        elif args.command == 'export':
+            sys.stdout.reconfigure(encoding='utf-8', newline='')
+            export_csv(args.database, sys.stdout)
         else:
-            print(json.dumps(ingest(args.archive, args.database), sort_keys=True))
+            print(json.dumps(ingest(args.archive, args.database, rebuild=args.command == 'rebuild'),
+                             sort_keys=True))
     except (ValueError, OSError, sqlite3.Error) as exc:
         parser.exit(1, f'History error: {exc}\n')
 

@@ -38,6 +38,10 @@ reports the outcome and any issues for each source. Other sportsbook displays ha
 Pinnacle collection, cross-book matching, and the +EV analysis engine remain under
 development.
 
+Use `history.py ingest` or `history.py rebuild` to query a shared archive locally
+and `history.py export` to produce CSV. Devices exchange reviewed JSONL batches
+and manifests through explicit Git synchronization.
+
 This is a research system using free scraped sources. It does not place bets.
 Website changes and access restrictions can interrupt collection, and historical
 prices do not guarantee current availability or a profitable strategy.

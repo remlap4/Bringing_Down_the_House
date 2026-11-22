@@ -7,6 +7,7 @@ from typing import Protocol
 from uuid import uuid4
 
 from history import PublishedBatch, archive_draftkings, ingest
+from pinnacle import PinnacleAdapter
 from scraper import capture_snapshot
 
 
@@ -35,16 +36,17 @@ class DraftKingsAdapter:
         return archive_draftkings(snapshot, archive, device, evidence_path)
 
 
-def collect(adapters, root, archive, database, device):
+def collect(adapters, root, archive, database, device, *, saved_snapshot=None):
     results = []
     for adapter in adapters:
-        snapshot = root / 'data' / 'raw' / uuid4().hex / adapter.source
+        snapshot = saved_snapshot or root / 'data' / 'raw' / uuid4().hex / adapter.source
         evidence_path = (snapshot / 'page.html').relative_to(root).as_posix()
         result = {'source': adapter.source, 'snapshot': str(snapshot)}
         results.append(result)
         phase = 'capture'
         try:
-            adapter.capture(snapshot)
+            if saved_snapshot is None:
+                adapter.capture(snapshot)
             phase = 'validate_or_archive'
             batch = adapter.archive(snapshot, archive, device, evidence_path)
             result.update(manifest=str(batch.manifest), observations=batch.observations,
@@ -65,6 +67,8 @@ def main(argv=None):
     commands = parser.add_subparsers(dest='command', required=True)
     command = commands.add_parser('collect')
     command.add_argument('--sport', choices=['nba'], required=True)
+    command.add_argument('--source', choices=['draftkings', 'pinnacle'], default='draftkings')
+    command.add_argument('--snapshot', type=Path, help='Replay a saved Pinnacle capture offline')
     command.add_argument('--device', default='local', help='Non-sensitive capture device label')
     command.add_argument('--archive', type=Path, default=Path('archive'))
     command.add_argument('--database', type=Path, default=Path('data/local/odds.sqlite'))
@@ -76,9 +80,18 @@ def main(argv=None):
         command.error('--device must contain a non-whitespace character')
     root = Path.cwd()
     os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', str(Path(__file__).resolve().parent / '.browsers'))
-    adapters = [DraftKingsAdapter(headed=not args.headless, channel=args.channel,
-                                 via_home=args.via_home)]
-    report = collect(adapters, root, args.archive.resolve(), args.database.resolve(), args.device)
+    snapshot = args.snapshot.resolve() if args.snapshot else None
+    if snapshot and (args.source != 'pinnacle' or not snapshot.is_relative_to(root)):
+        command.error('--snapshot requires a Pinnacle capture directory under the repository root')
+    if args.source == 'pinnacle':
+        if args.via_home:
+            command.error('--via-home is only supported for DraftKings')
+        adapter = PinnacleAdapter(headed=not args.headless, channel=args.channel)
+    else:
+        adapter = DraftKingsAdapter(headed=not args.headless, channel=args.channel,
+                                    via_home=args.via_home)
+    report = collect([adapter], root, args.archive.resolve(), args.database.resolve(), args.device,
+                     saved_snapshot=snapshot)
     print(json.dumps(report, indent=2))
     return int(any(source['status'] == 'failed' for source in report['sources']))
 

@@ -164,12 +164,27 @@ def archive_draftkings(snapshot, archive, device, evidence_path, supersedes=None
     run_id = identifier('draftkings', digest, captured)
     records = [normalize(record, run_id, parser_version, captured, started, verified['method'],
                          evidence_path) for record in parsed['records']]
-    records.sort(key=lambda record: record['observation_id'])
+    return publish_verified_batch(
+        archive, device, records, parsed['pregame_eligible_count'], parsed['issues'],
+        supersedes=supersedes,
+    )
+
+
+def publish_verified_batch(archive, device, records, verified_pregame, issues, *, supersedes=None):
+    string(device, 'device label')
+    require(bool(records), 'No verified observations to publish')
+    first = records[0]
+    source, run_id, captured = (first[key] for key in ('source', 'run_id', 'observed_at_utc'))
+    provenance = first['provenance']
+    parser_version, started, digest = (
+        provenance[key] for key in ('parser_version', 'capture_started_at_utc', 'html_sha256')
+    )
+    records = sorted(records, key=lambda record: record['observation_id'])
     batch = b''.join(map(encode, records))
     manifest = {
         'manifest_version': 1, 'schema_version': 1, 'status': 'complete',
         'batch_id': identifier(run_id, parser_version, 1), 'run_id': run_id,
-        'source': 'draftkings', 'device': device, 'observed_at_utc': captured,
+        'source': source, 'device': device, 'observed_at_utc': captured,
         'capture_started_at_utc': started, 'parser_version': parser_version,
         'html_sha256': digest, 'batch_sha256': sha(batch), 'row_count': len(records),
         'supersedes_batch_id': None,
@@ -184,7 +199,7 @@ def archive_draftkings(snapshot, archive, device, evidence_path, supersedes=None
     atomic_publish(archive / batch_path, batch)
     atomic_publish(archive / manifest_path, encode(manifest))
     return PublishedBatch(archive / manifest_path, len(records),
-                          parsed['pregame_eligible_count'], parsed['issues'])
+                          verified_pregame, issues)
 
 
 def load_batch(archive, path):

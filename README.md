@@ -34,8 +34,10 @@ queries, and Python's **unittest** framework checks data handling and failure ca
 From the repository root, `python run.py collect --sport nba` uses the configured
 Python environment to capture DraftKings NBA moneylines, verify prices against
 rendered text, archive the observations, and import them into SQLite. The command
-reports the outcome and any issues for each source. Other sportsbook displays have been explored, but
-Pinnacle collection, cross-book matching, and the +EV analysis engine remain under
+reports the outcome and any issues for the selected source. Add
+`--source pinnacle` for full-game pregame NBA moneylines from Pinnacle. The
+adapter was verified offline against two saved public captures. Cross-book
+matching, settlement compatibility, and the +EV analysis engine remain under
 development.
 
 Use `history.py ingest` or `history.py rebuild` to query a shared archive locally

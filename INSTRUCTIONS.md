@@ -60,6 +60,28 @@ to follow the NBA link from the homepage. Use `--headless` to run without a visi
 window or `--channel chrome` or `--channel msedge` to use an installed browser.
 Direct navigation has been exercised with mocked browser responses.
 
+Select Pinnacle with the same Python environment and command:
+
+```sh
+.venv/bin/python run.py collect --sport nba --source pinnacle
+.venv/bin/python run.py collect --sport nba --source pinnacle --snapshot data/source_probes/CAPTURE_DIRECTORY
+```
+
+The second command replays a saved capture without opening a browser. Use a
+directory under the repository root containing `metadata.json`, `page.html`,
+and `visible.txt`. Replay retains the original observation time.
+
+The adapter accepts the supported English decimal NBA board layout with Today
+or Tomorrow date groups. It compares both prices in display order against
+rendered text and checks the displayed clock against the capture timezone
+before resolving future starts. If any row in a supported pregame table is
+incomplete, unavailable, ambiguous, or mismatched, the source fails validation
+and publishes no batch. Two saved captures passed offline validation. Current
+page layout and availability can change. The page exposes event IDs, while
+selection IDs and bookmaker update times remain unknown. Records identify the
+published rule profile and its overtime treatment, with applicability to
+individual quotes still unverified.
+
 Choose a stable, non-sensitive `--device` label for each machine sharing an archive.
 It defaults to `local`. Raw evidence goes under `data/raw/`. Use `--archive` and
 `--database` to override `archive/` and `data/local/odds.sqlite`.
@@ -132,7 +154,6 @@ DraftKings as the initial comparison book. Pinnacle rendered five NBA matchups i
 two separate captures. FanDuel is the preferred additional comparison candidate;
 Betway displayed prices but also a location prompt and differing start times.
 See `config/source_review.json` for exact provenance and unresolved limitations.
-Only DraftKings currently has a functioning verified odds parser.
 
 `config/settlement_rules.json` records separate reviewed rule-page profiles. Both
 books include overtime for standard full-game NBA moneylines, but interruption

@@ -222,6 +222,54 @@ Treat source text and odds as text when importing into a spreadsheet. Save
 exports, databases, and raw evidence under the Git-ignored `data/` directory.
 Rechecking the original prices requires the original evidence.
 
+### Match archived NBA moneylines
+
+After ingesting, find two observation IDs in the `history.py export` CSV and run:
+
+```sh
+.venv/bin/python matching.py OBSERVATION_ID_A OBSERVATION_ID_B
+```
+
+Use `--database PATH` for a different SQLite database. The command reads current,
+non-superseded observations and prints JSON with canonical event IDs, team IDs in
+selection order, schedule history, bound rule IDs, and reasons to suppress the
+pair. A successful command can return `comparable: false`. Invalid inputs or a
+missing or superseded observation exit with code 1.
+
+The matcher uses the exact aliases in `config/nba_teams.json`, ignoring case and
+whitespace differences. Without a reviewed mapping, the same unordered team pair
+and exact UTC start yield the same event ID. Nearby names or start times are
+never merged. Multiple source IDs for the same source and schedule slot, and
+unreviewed changes under a single source event ID, are quarantined. If all
+sources replace their IDs and start times, the matcher needs a reviewed mapping
+to link the new listings to the earlier game.
+
+Use `--reviews data/matching-reviews.json` with a local evidence-backed JSON file.
+The file has two arrays, `events` and `rule_bindings`. Either may be empty.
+
+- An `events` entry contains `teams` (two canonical team IDs),
+  `scheduled_starts` (UTC ISO timestamps in revision order, original first),
+  `source_events` (objects with `source` and `source_event_id`), and
+  `evidence` (a reference documenting the reviewed schedule and source mappings).
+  List each applicable source ID, including replacements after a postponement.
+  The original start anchors the event ID. Quotes reporting different starts
+  stay incomparable even when both belong to the same canonical event.
+- A `rule_bindings` entry contains `observation_id`, `observation_sha256`,
+  `rule_id` from `config/settlement_rules.json`, and `evidence` documenting
+  applicability to that exact quote, including the offering's jurisdiction,
+  market, and rule version in force at capture. The digest is SHA-256 of the UTF-8
+  `observations.payload` value in SQLite, including its final newline. In Python
+  it can be computed with `history.sha(history.encode(record))`. A rendered price
+  check or a rule-page reference alone is insufficient evidence.
+
+Archived quotes and their original rule flags stay intact. Reviewed bindings
+are additional matching inputs. A missing binding leaves settlement compatibility
+unknown. With both bindings verified against their payloads, the distinct
+Pinnacle and DraftKings profiles are explicitly incompatible, including on
+delays and interruptions. The matcher performs a retrospective identity and
+settlement check. It does not assess quote freshness, calculate EV, or assume a
+game completes normally.
+
 ### Synchronize history across devices
 
 1. Finish or pause local collection and confirm a clean working tree with

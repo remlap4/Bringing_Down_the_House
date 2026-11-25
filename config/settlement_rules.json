@@ -68,6 +68,10 @@
         "pinnacle",
         "draftkings"
       ],
+      "rule_ids": [
+        "pinnacle:nba:full_game:2026-11-17",
+        "draftkings:nba:full_game:2026-11-17"
+      ],
       "market": "NBA full-game two-way moneyline",
       "overtime_alignment": true,
       "full_settlement_equivalence": false,

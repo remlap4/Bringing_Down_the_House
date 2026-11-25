@@ -36,9 +36,14 @@ Python environment to capture DraftKings NBA moneylines, verify prices against
 rendered text, archive the observations, and import them into SQLite. The command
 reports the outcome and any issues for the selected source. Add
 `--source pinnacle` for full-game pregame NBA moneylines from Pinnacle. The
-adapter was verified offline against two saved public captures. Cross-book
-matching, settlement compatibility, and the +EV analysis engine remain under
-development.
+adapter was verified offline against two saved public captures.
+
+Use `python matching.py OBSERVATION_ID_A OBSERVATION_ID_B` to inspect event
+identity, team outcomes, and settlement compatibility in local history. The
+matcher quarantines ambiguous listings and suppresses comparisons with unknown or
+different settlement rules. Pinnacle and DraftKings have different interruption
+and void rules, so their quotes cannot pass the settlement check. The +EV engine
+remains under development.
 
 Use `history.py ingest` or `history.py rebuild` to query a shared archive locally
 and `history.py export` to produce CSV. Devices exchange reviewed JSONL batches

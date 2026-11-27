@@ -17,10 +17,10 @@ The project follows a data-first workflow:
    betting lines, settlement rules, and quote freshness.
 5. **Evaluate candidate edges** using historical and forward-collected observations.
 
-The planned analysis uses Pinnacle prices, adjusted to remove the bookmaker's
-margin, as a reference for estimating fair probabilities and identifying potential
-positive expected value (+EV). These are probability estimates, not known true
-probabilities. Cross-book arbitrage is a later extension.
+The offline moneyline analysis estimates fair probabilities by removing the
+reference bookmaker's margin proportionally. It uses those estimates to
+calculate expected return per unit staked at the comparison price. Cross-book
+arbitrage is a later extension.
 
 ## Software
 
@@ -42,8 +42,14 @@ Use `python matching.py OBSERVATION_ID_A OBSERVATION_ID_B` to inspect event
 identity, team outcomes, and settlement compatibility in local history. The
 matcher quarantines ambiguous listings and suppresses comparisons with unknown or
 different settlement rules. Pinnacle and DraftKings have different interruption
-and void rules, so their quotes cannot pass the settlement check. The +EV engine
-remains under development.
+and void rules, so their quotes cannot pass the settlement check.
+
+The `evaluate_moneyline` Python API in `moneyline_ev.py` evaluates a chosen
+candidate listing and reference source from local observations at a specified UTC
+decision time. It returns probability and EV estimates for eligible pairs,
+along with pricing evidence and reasons for rejected pairs. See the
+[offline analysis instructions](INSTRUCTIONS.md#evaluate-moneyline-ev-offline) for
+inputs, defaults, and replay limitations.
 
 Use `history.py ingest` or `history.py rebuild` to query a shared archive locally
 and `history.py export` to produce CSV. Devices exchange reviewed JSONL batches

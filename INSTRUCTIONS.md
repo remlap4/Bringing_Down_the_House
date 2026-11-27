@@ -270,6 +270,59 @@ delays and interruptions. The matcher performs a retrospective identity and
 settlement check. It does not assess quote freshness, calculate EV, or assume a
 game completes normally.
 
+### Evaluate moneyline EV offline
+
+From the repository root, use the project Python environment described above
+and import the evaluator in Python:
+
+```python
+from moneyline_ev import evaluate_moneyline
+
+result = evaluate_moneyline(
+    records,
+    candidate_source="draftkings",
+    candidate_event_id=source_event_id,
+    reference_source="pinnacle",
+    as_of_utc="2026-11-17T22:08:00Z",
+    event_reviews=reviews["events"],
+    rule_bindings=reviews["rule_bindings"],
+)
+```
+
+Supply an iterable of decoded version 1 observation payloads as `records`,
+including all available listing states for the two sources. Use the candidate's
+`event.source_event_id` as `source_event_id`. Reviews use the same structure as
+the matcher. The example source pair will be rejected under the existing
+settlement rules.
+
+The evaluator ignores observations after `as_of_utc` before selecting current
+listings or checking event identity. It uses the newest visible observation for
+the candidate listing and finds the reference listing by unordered teams and
+exact scheduled start. Tied newest observations and ambiguous listings are
+rejected. The latest visible suspended, unverified, or otherwise ineligible
+quote blocks use of older prices for that listing. A source that omits a listing
+or suspension from the supplied records provides no explicit indication of
+that state.
+
+The defaults allow up to 120 seconds of age for either quote and up to 60 seconds
+between the two observations, inclusive. Both markets must have two available
+prices, compatible reviewed settlement rules, and a verified pregame event with
+a start after the decision time. Each reference fair probability is its inverse
+decimal price divided by the sum of both inverse prices. Estimated EV per unit
+is the resulting probability times the candidate decimal price minus one.
+`estimates` contains both sides of an eligible pair. `signals` contains positive
+estimates meeting the default 2% threshold. The optional `max_age_seconds`,
+`max_skew_seconds`, and `min_ev` arguments override these settings. The result
+includes observation and selection identifiers when supplied, source URLs,
+verification, payload hashes, rule IDs, times, and rejection reasons.
+
+Replay uses observation times for the cutoff. The archive does not record when a
+corrected parse or review first became available. For an as-known-at-the-time
+replay, supply a frozen observation set and matching reviews from that time.
+Passing today's active observations and reviews instead evaluates past quotes
+with today's corrections and review knowledge. Quote age measures time since
+capture, and the fair probability remains an estimate.
+
 ### Synchronize history across devices
 
 1. Finish or pause local collection and confirm a clean working tree with

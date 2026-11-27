@@ -87,13 +87,13 @@ def evaluate_moneyline(records, candidate_source, candidate_event_id, reference_
                                   ('reference', reference, right)):
         result[role] = quote_provenance(record, as_of)
         result[role]['bound_rule_id'] = matched['bound_rule_id']
+    result['canonical_event_id'] = left['canonical_event_id']
     reasons = match['reasons']
     if candidate['bookmaker'] == reference['bookmaker']:
         reasons.append('same_bookmaker')
     if reasons:
         return reject(*reasons)
 
-    result['canonical_event_id'] = left['canonical_event_id']
     result['scheduled_start_utc'] = left['scheduled_start_utc']
     reasons = []
     for role in ('candidate', 'reference'):
@@ -135,6 +135,7 @@ def quote_provenance(record, as_of):
         'source_url': record['source_url'], 'observed_at_utc': observed.isoformat(),
         'source_updated_at_utc': record['source_updated_at_utc'],
         'age_seconds': (as_of - observed).total_seconds(),
+        'event': dict(record['event']), 'market': dict(record['market']),
         'provenance': dict(record['provenance']), 'verification': dict(record['verification']),
         'selections': [dict(selection) for selection in record['selections']],
     }

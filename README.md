@@ -38,6 +38,13 @@ reports the outcome and any issues for the selected source. Add
 `--source pinnacle` for full-game pregame NBA moneylines from Pinnacle. The
 adapter was verified offline against two saved public captures.
 
+Run `python run.py moneyline --sport nba --csv data/reports/moneyline.csv`
+after [setup](INSTRUCTIONS.md) to collect both sources, archive and import each
+successful capture, and write a local terminal summary and audit CSV. Use a fresh
+CSV path for each run. The report includes source failures, rejected comparisons,
+and any eligible outcome estimates from that invocation. See the
+[moneyline report instructions](INSTRUCTIONS.md#collect-and-report-nba-moneylines).
+
 Use `python matching.py OBSERVATION_ID_A OBSERVATION_ID_B` to inspect event
 identity, team outcomes, and settlement compatibility in local history. The
 matcher quarantines ambiguous listings and suppresses comparisons with unknown or

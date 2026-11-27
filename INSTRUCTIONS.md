@@ -104,6 +104,47 @@ archive remains available for retry with `history.py ingest` and the same paths.
 Collection imports each newly published batch individually. Use the offline
 ingest command below to import the rest of an archive.
 
+## Collect and report NBA moneylines
+
+After setup, run from the repository root with the project Python environment.
+
+```sh
+.venv/bin/python run.py moneyline --sport nba --csv data/reports/moneyline.csv
+```
+
+The command captures Pinnacle followed by DraftKings and archives and imports
+each successful source independently. Use `--archive` and `--database` to override
+the default archive and SQLite paths. Use `--headless` for bundled Chromium
+without a visible window, or `--channel chrome` or `--channel msedge` for an
+installed browser. Supply a fresh CSV path for each run. The report is published
+atomically, and a report write failure leaves successfully imported history
+available.
+
+The terminal summarizes source health, rejection counts, eligible comparisons,
+and outcomes meeting the EV threshold. The CSV includes a row for each source,
+one row per rejected candidate listing or per eligible outcome, and a summary
+row. Source rows identify the saved capture and batch manifest and include any
+collection failure phase and message. Comparison rows record the scheduled start,
+market, outcome, available estimates and capture skew. The JSON in
+`candidate_quotes` and `reference_quote` carries the original odds, source URLs,
+observation and run IDs, hashes, timestamps, verification details and evidence
+paths for drill-down. Probabilities and EV are decimal fractions.
+
+Only batches successfully imported by this invocation enter the comparison.
+The decision time is taken after collection. The evaluator applies its default
+120-second maximum quote age, 60-second maximum capture skew and 2% EV display
+threshold. Use `--reviews` with the evidence-backed JSON described in the
+matching section to supply reviewed mappings and quote bindings. The published
+Pinnacle and DraftKings settlement profiles differ, so the pair is ineligible
+under the shipped rules, including with verified quote bindings. A source can
+also be inaccessible or lack usable coverage.
+
+Exit status 0 means both sources completed and the report was written. The
+summary distinguishes zero eligible comparisons from eligible comparisons
+with zero qualifying outcomes. A source failure returns status 1 with an
+audit CSV that records the failure and any successful collection. Report
+validation or write errors also return status 1 and print a diagnostic.
+
 ## Standalone snapshot results
 
 - `quotes.jsonl`: validated two-selection moneyline cards, including live and unknown-status events. Team names exclude scoreboard text; scores are in `scores_in_display_order`.

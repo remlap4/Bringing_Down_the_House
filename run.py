@@ -2,11 +2,15 @@
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Protocol
 from uuid import uuid4
 
 from history import PublishedBatch, archive_draftkings, ingest
+from moneyline_report import report_moneylines
+from matching import read_json
+from moneyline_contract import fields, require
 from pinnacle import PinnacleAdapter
 from scraper import capture_snapshot
 
@@ -65,21 +69,44 @@ def collect(adapters, root, archive, database, device, *, saved_snapshot=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
-    command = commands.add_parser('collect')
-    command.add_argument('--sport', choices=['nba'], required=True)
-    command.add_argument('--source', choices=['draftkings', 'pinnacle'], default='draftkings')
-    command.add_argument('--snapshot', type=Path, help='Replay a saved Pinnacle capture offline')
-    command.add_argument('--device', default='local', help='Non-sensitive capture device label')
-    command.add_argument('--archive', type=Path, default=Path('archive'))
-    command.add_argument('--database', type=Path, default=Path('data/local/odds.sqlite'))
-    command.add_argument('--headless', action='store_true')
-    command.add_argument('--channel', choices=['chrome', 'msedge'])
-    command.add_argument('--via-home', action='store_true', help='Follow DraftKings’ NBA link from its homepage')
+    collect_command = commands.add_parser('collect')
+    collect_command.add_argument('--source', choices=['draftkings', 'pinnacle'], default='draftkings')
+    collect_command.add_argument('--snapshot', type=Path, help='Replay a saved Pinnacle capture offline')
+    moneyline_command = commands.add_parser('moneyline', help='Collect both sources and write an audit CSV')
+    moneyline_command.add_argument('--csv', type=Path, required=True, help='Path for a new report CSV')
+    moneyline_command.add_argument('--reviews', type=Path, help='JSON with reviewed event mappings and rule bindings')
+    for command in (collect_command, moneyline_command):
+        command.add_argument('--sport', choices=['nba'], required=True)
+        command.add_argument('--device', default='local', help='Non-sensitive capture device label')
+        command.add_argument('--archive', type=Path, default=Path('archive'))
+        command.add_argument('--database', type=Path, default=Path('data/local/odds.sqlite'))
+        command.add_argument('--headless', action='store_true')
+        command.add_argument('--channel', choices=['chrome', 'msedge'])
+        command.add_argument('--via-home', action='store_true', help='Follow DraftKings’ NBA link from its homepage')
     args = parser.parse_args(argv)
+    command = moneyline_command if args.command == 'moneyline' else collect_command
     if not args.device.strip():
         command.error('--device must contain a non-whitespace character')
     root = Path.cwd()
     os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', str(Path(__file__).resolve().parent / '.browsers'))
+    if args.command == 'moneyline':
+        try:
+            reviews = read_json(args.reviews) if args.reviews else {'events': [], 'rule_bindings': []}
+            fields(reviews, 'events rule_bindings', 'matching reviews')
+            require(all(isinstance(value, list) for value in reviews.values()), 'Expected review lists')
+            output = args.csv.resolve()
+            require(not output.exists(), f'Report path already exists: {output}')
+            archive, database = args.archive.resolve(), args.database.resolve()
+            require(output != database, 'Report and database paths must differ')
+            adapters = [
+                PinnacleAdapter(headed=not args.headless, channel=args.channel),
+                DraftKingsAdapter(headed=not args.headless, channel=args.channel, via_home=args.via_home),
+            ]
+            collection = collect(adapters, root, archive, database, args.device)
+            return report_moneylines(collection, archive, output, reviews)
+        except (ValueError, OSError) as exc:
+            print(f'Moneyline report error: {exc}', file=sys.stderr)
+            return 1
     snapshot = args.snapshot.resolve() if args.snapshot else None
     if snapshot and (args.source != 'pinnacle' or not snapshot.is_relative_to(root)):
         command.error('--snapshot requires a Pinnacle capture directory under the repository root')
